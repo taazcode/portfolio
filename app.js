@@ -4,9 +4,45 @@
    Data persists in localStorage.
    ══════════════════════════════════════════════════════════ */
 
-// SHA-256 hash of 'control' — plain text password is not stored in source code
-const ADMIN_PASSWORD_HASH = '0fcd568a5cb9bdb4677b69354b11ee415af8f784519cff3da49a26f84eaee7f2';
-const STORAGE_KEY = 'cyberNexusData';
+// ── SUPABASE CONFIGURATION (.env Loader) ───────────────────
+let SUPABASE_URL = 'https://jmlspukljchjexssbbpv.supabase.co';
+let SUPABASE_ANON_KEY = '';
+let supabaseClient = null;
+
+async function initSupabase() {
+  try {
+    const res = await fetch('.env');
+    if (res.ok) {
+      const text = await res.text();
+      text.split('\n').forEach(line => {
+        const parts = line.split('=');
+        if (parts.length >= 2) {
+          const key = parts[0].trim();
+          const val = parts.slice(1).join('=').trim().replace(/^["']|["']$/g, '');
+          if (key === 'SUPABASE_URL' && val) SUPABASE_URL = val;
+          if ((key === 'SUPABASE_ANON_KEY' || key === 'supabse_anon_APIKEY' || key === 'SUPABASE_ANON_APIKEY') && val) {
+            SUPABASE_ANON_KEY = val;
+          }
+        }
+      });
+    }
+  } catch (e) {
+    // Fallback if fetch fails (e.g. file:// protocol)
+  }
+
+  if (typeof window.supabase !== 'undefined' && SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
+    try {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log('✓ Supabase Client Initialized via .env');
+      if (typeof renderAdminGuild === 'function') renderAdminGuild();
+    } catch (err) {
+      console.warn('Supabase initialization warning:', err);
+    }
+  }
+}
+
+// Trigger initialization on load
+initSupabase();
 
 // Helper function to compute SHA-256 hash using native Web Crypto API
 async function sha256(message) {
@@ -51,6 +87,10 @@ const DEFAULT_DATA = {
     { id: 'sk2', name: 'LINUX & NETWORKING', mastery: 40, color: 'cyan' },
     { id: 'sk3', name: 'GCP CLOUD', mastery: 50, color: 'purple' },
     { id: 'sk4', name: 'CYBERSECURITY BASICS', mastery: 30, color: 'purple' }
+  ],
+  guild: [
+    { id: 'g1', email: 'alex.v@cyber.io', date: '2026-09-10 14:32' },
+    { id: 'g2', email: 'dev_runner@nexus.net', date: '2026-09-12 09:15' }
   ]
 };
 
@@ -181,10 +221,105 @@ function renderAdminSkills() {
   `).join('');
 }
 
+async function renderAdminGuild() {
+  const c = document.getElementById('admin-guild-list');
+  const countSpan = document.getElementById('adm-guild-count');
+  if (!appData.guild) appData.guild = [];
+
+  // Fetch from Supabase if configured
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from('guild_subscribers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        appData.guild = data.map(item => ({
+          id: item.id,
+          email: item.email,
+          date: item.created_at ? new Date(item.created_at).toISOString().slice(0, 10) + ' ' + new Date(item.created_at).toTimeString().slice(0, 5) : 'Recently'
+        }));
+      }
+    } catch (e) {
+      console.warn('Supabase fetch failed, fallback to local storage:', e);
+    }
+  }
+
+  if (countSpan) countSpan.textContent = appData.guild.length;
+  if (!c) return;
+  if (appData.guild.length === 0) {
+    c.innerHTML = `<div class="adm-empty">No enlisted players yet.</div>`;
+    return;
+  }
+  c.innerHTML = appData.guild.map(g => `
+    <div class="adm-guild-row">
+      <div class="adm-guild-info">
+        <strong class="adm-guild-email">${g.email}</strong>
+        <span class="adm-guild-date">${g.date || 'Recently'}</span>
+      </div>
+      <button class="adm-btn-delete" title="Remove player" onclick="deleteGuildSubscriber('${g.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+async function enlistPlayer(email) {
+  if (!email) return;
+  if (!appData.guild) appData.guild = [];
+  const exists = appData.guild.some(g => g.email.toLowerCase() === email.toLowerCase());
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
+
+  if (!exists) {
+    appData.guild.unshift({
+      id: 'g' + Date.now(),
+      email: email,
+      date: dateStr
+    });
+    saveData(appData);
+  }
+
+  // Sync to Supabase if configured
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from('guild_subscribers').insert([{ email }]);
+    } catch (err) {
+      console.warn('Supabase insert error:', err);
+    }
+  }
+
+  renderAdminGuild();
+}
+
+async function deleteGuildSubscriber(id) {
+  if (!appData.guild) return;
+
+  if (supabaseClient && typeof id === 'string' && id.includes('-')) {
+    try {
+      await supabaseClient.from('guild_subscribers').delete().eq('id', id);
+    } catch (err) {
+      console.warn('Supabase delete error:', err);
+    }
+  }
+
+  appData.guild = appData.guild.filter(g => g.id !== id);
+  saveData(appData);
+  renderAdminGuild();
+}
+
+function clearGuildSubscribers() {
+  if (confirm('Clear all enlisted players from the log?')) {
+    appData.guild = [];
+    saveData(appData);
+    renderAdminGuild();
+  }
+}
+
 function renderAdminAll() {
   renderAdminStats();
   renderAdminProjects();
   renderAdminSkills();
+  renderAdminGuild();
 }
 
 // ── ADMIN ACTIONS ─────────────────────────────────────────

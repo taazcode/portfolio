@@ -13,6 +13,7 @@
     href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="index.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
@@ -385,6 +386,7 @@
           <button class="adm-tab-btn active" data-tab="stats">📊 Stats</button>
           <button class="adm-tab-btn" data-tab="projects">🚀 Arsenal</button>
           <button class="adm-tab-btn" data-tab="skills">🛡 Skills</button>
+          <button class="adm-tab-btn" data-tab="guild">⚔ Guild (<span id="adm-guild-count">0</span>)</button>
         </div>
 
         <!-- TAB: Stats -->
@@ -429,6 +431,15 @@
           </div>
         </div>
 
+        <!-- TAB: Guild Enlisted Players -->
+        <div id="adm-tab-guild" class="adm-tab-content hidden">
+          <div class="adm-form-divider">ENLISTED PLAYERS LOG</div>
+          <div id="admin-guild-list" class="adm-list"></div>
+          <div style="margin-top:16px; text-align:right;">
+            <button class="adm-btn-danger" onclick="clearGuildSubscribers()">🗑 CLEAR ENLISTED LOG</button>
+          </div>
+        </div>
+
         <!-- Reset -->
         <div class="adm-footer">
           <button class="adm-btn-danger" onclick="resetToDefaults()">⚠ RESET TO DEFAULTS</button>
@@ -454,10 +465,12 @@
 
     sections.forEach(s => obs.observe(s));
 
-    // Sign up button feedback
+    // Sign up button feedback & enlistment
     document.querySelector('.btn-signup').addEventListener('click', () => {
       const input = document.querySelector('.guild-input');
-      if (input.value) {
+      const val = input.value.trim();
+      if (val) {
+        if (typeof enlistPlayer === 'function') enlistPlayer(val);
         input.value = '';
         input.placeholder = 'PLAYER ENLISTED ✓';
         input.style.borderColor = 'var(--tertiary)';
