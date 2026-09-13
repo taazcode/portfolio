@@ -75,6 +75,9 @@ nav {
   justify-content: space-between;
   padding: 0 24px;
   height: 48px;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden;
   background: rgba(13,13,13,0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -91,12 +94,16 @@ nav {
   letter-spacing: 0.1em;
   color: var(--tertiary);
   text-transform: uppercase;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .nav-links {
   display: flex;
-  gap: 32px;
+  gap: clamp(12px, 2.5vw, 32px);
   list-style: none;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .nav-links a {
@@ -128,7 +135,9 @@ nav {
 .nav-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .level-badge {
