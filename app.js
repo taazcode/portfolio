@@ -4,8 +4,17 @@
    Data persists in localStorage.
    ══════════════════════════════════════════════════════════ */
 
-const ADMIN_PASSWORD = 'control';
+// SHA-256 hash of 'control' — plain text password is not stored in source code
+const ADMIN_PASSWORD_HASH = '0fcd568a5cb9bdb4677b69354b11ee415af8f784519cff3da49a26f84eaee7f2';
 const STORAGE_KEY = 'cyberNexusData';
+
+// Helper function to compute SHA-256 hash using native Web Crypto API
+async function sha256(message) {
+  const msgUint8 = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 // ── DEFAULT DATA ──────────────────────────────────────────
 const DEFAULT_DATA = {
@@ -328,9 +337,10 @@ function showAdminDashboard() {
   switchAdminTab('stats');
 }
 
-function attemptAdminLogin() {
+async function attemptAdminLogin() {
   const pw = document.getElementById('admin-pw').value;
-  if (pw === ADMIN_PASSWORD) {
+  const hash = await sha256(pw);
+  if (hash === ADMIN_PASSWORD_HASH) {
     adminUnlocked = true;
     showAdminDashboard();
   } else {
