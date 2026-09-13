@@ -41,8 +41,8 @@ async function initSupabase() {
   }
 }
 
-// Trigger initialization on load
-initSupabase();
+// Trigger initialization on load — stored as a promise so other functions can await it
+const supabaseReady = initSupabase();
 
 // Helper function to compute SHA-256 hash using native Web Crypto API
 async function sha256(message) {
@@ -271,21 +271,23 @@ async function enlistPlayer(email) {
   const dateStr = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
 
   if (!exists) {
-    appData.guild.unshift({
-      id: 'g' + Date.now(),
-      email: email,
-      date: dateStr
-    });
+    appData.guild.unshift({ id: 'g' + Date.now(), email, date: dateStr });
     saveData(appData);
   }
 
-  // Sync to Supabase if configured
+  // Wait for Supabase to finish initialising (resolves the race condition)
+  await supabaseReady;
+
   if (supabaseClient) {
     try {
-      await supabaseClient.from('guild_subscribers').insert([{ email }]);
+      const { error } = await supabaseClient.from('guild_subscribers').insert([{ email }]);
+      if (error) console.warn('Supabase insert error:', error.message);
+      else console.log('✓ Guild enlistment saved to Supabase:', email);
     } catch (err) {
-      console.warn('Supabase insert error:', err);
+      console.warn('Supabase insert exception:', err);
     }
+  } else {
+    console.warn('Supabase not configured — saved to localStorage only.');
   }
 
   renderAdminGuild();
@@ -421,6 +423,8 @@ function addSkill() {
 }
 
 // ── ADMIN MODAL LOGIC ─────────────────────────────────────
+// SHA-256 hash of the password 'control' — plaintext is never stored in source
+const ADMIN_PASSWORD_HASH = '0fcd568a5cb9bdb4677b69354b11ee415af8f784519cff3da49a26f84eaee7f2';
 let adminUnlocked = false;
 let clickCount = 0;
 let clickTimer = null;
