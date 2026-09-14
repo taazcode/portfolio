@@ -5,8 +5,10 @@
    ══════════════════════════════════════════════════════════ */
 
 // ── SUPABASE CONFIGURATION (.env Loader) ───────────────────
+try { require('dotenv').config(); } catch (e) { /* dotenv unavailable in browser */ }
+
 let SUPABASE_URL = 'https://jmlspukljchjexssbbpv.supabase.co';
-let SUPABASE_ANON_KEY = '';
+let SUPABASE_ANON_KEY = (typeof process !== 'undefined' && process.env && process.env.SUPABASE_ANON_KEY) || null;
 let supabaseClient = null;
 
 async function initSupabase() {
@@ -29,6 +31,8 @@ async function initSupabase() {
   } catch (e) {
     // Fallback if fetch fails (e.g. file:// protocol)
   }
+  console.log('SUPABASE_URL from .env:', SUPABASE_URL);
+  console.log('SUPABASE_ANON_KEY from .env:', SUPABASE_ANON_KEY ? '***' : '(empty)');
 
   if (typeof window.supabase !== 'undefined' && SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
     try {
@@ -39,6 +43,22 @@ async function initSupabase() {
       console.warn('Supabase initialization warning:', err);
     }
   }
+  // Optional test query to verify connection
+  async function testSupabaseConnection() {
+    if (!supabaseClient) return;
+    try {
+      const { count, error } = await supabaseClient
+        .from('guild_subscribers')
+        .select('id', { count: 'exact', head: true });
+      if (error) throw error;
+      console.log('Supabase test query succeeded, row count:', count);
+    } catch (e) {
+      console.warn('Supabase test query failed:', e);
+    }
+  }
+
+  // Run test after initialization
+  if (supabaseClient) testSupabaseConnection();
 }
 
 // Trigger initialization on load — stored as a promise so other functions can await it
@@ -435,10 +455,13 @@ function initAdminTrigger() {
 
   logo.addEventListener('click', () => {
     clickCount++;
+    console.log('Admin logo click count:', clickCount);
     clearTimeout(clickTimer);
-    clickTimer = setTimeout(() => { clickCount = 0; }, 800);
+    // Increase timeout to give the user more leeway between clicks
+    clickTimer = setTimeout(() => { clickCount = 0; }, 1500);
 
     if (clickCount >= 5) {
+      console.log('Admin trigger activated');
       clickCount = 0;
       openAdminModal();
     }
